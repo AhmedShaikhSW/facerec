@@ -7,11 +7,12 @@ import face_recognition
 import cv2
 
 KNOWN_FACES_DIR = "known_faces"
-UNKNOWN_FACES_DIR = "unknown_faces"
 TOLERANCE = 0.6
 FRAME_THICKNESS = 3
 FONT_THICKNESS = 2
 MODEL = "cnn"   # can also use hog, better for cpu-only
+
+video = cv2.VideoCapture(0)
 
 print("Loading known faces...")
 
@@ -28,12 +29,11 @@ for name in os.listdir(KNOWN_FACES_DIR):
 
 print("Checking unknown faces...")
 
-for filename in os.listdir(UNKNOWN_FACES_DIR):
-    print(filename)
-    image = face_recognition.load_image_file(f"{UNKNOWN_FACES_DIR}/{filename}")
+while True:
+    ret, image = video.read()
+
     locations = face_recognition.face_locations(image, model=MODEL)
     encodings = face_recognition.face_encodings(image, locations)
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     for face_encoding, face_location in zip(encodings, locations):
         results = face_recognition.compare_faces(known_faces, face_encoding, TOLERANCE)
@@ -57,5 +57,7 @@ for filename in os.listdir(UNKNOWN_FACES_DIR):
             )
 
     cv2.imshow(filename, image)
-    cv2.waitKey(10000)
-    # cv2.destroyWindow(filename)   # does not work on *nix
+    
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        # break if user presses the q key
+        break
