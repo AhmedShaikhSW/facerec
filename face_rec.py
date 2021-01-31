@@ -2,40 +2,20 @@
 ## find . -name "*.DS_Store" -type f -delete
 ## in terminal
 
+## Start Ray server :
+## ray start --head --redis-port=5000
+
 import os
 import pickle
 import time
 import face_recognition
 import cv2
+import ray
 
-KNOWN_FACES_DIR = "known_faces"
-TOLERANCE = 0.6
-FRAME_THICKNESS = 3
-FONT_THICKNESS = 2
-MODEL = "cnn"   # can also use hog, better for cpu-only
+ray.init()
 
-video = cv2.VideoCapture("facerecvid.mp4")
-
-print("Loading known faces...")
-
-known_faces = []
-known_names = []
-
-for name in os.listdir(KNOWN_FACES_DIR):
-    for filename in os.listdir(f"{KNOWN_FACES_DIR}/{name}"):
-    # can also use os.join for better os independency
-        encoded_image = pickle.load(open(f"{name}/{filename}", "rb"))
-        known_faces.append(encoded_image)
-        known_names.append(int(name))
-
-if len(known_names) > 0:
-    next_id = max(known_names) + 1
-else:
-    next_id = 0
-
-print("Checking unknown faces...")
-
-while True:
+@ray.remote
+def detect_unknown():
     ret, image = video.read()
 
     locations = face_recognition.face_locations(image, model=MODEL)
@@ -71,7 +51,40 @@ while True:
         )
 
     cv2.imshow("", image)
-    
+
+
+KNOWN_FACES_DIR = "known_faces"
+TOLERANCE = 0.6
+FRAME_THICKNESS = 3
+FONT_THICKNESS = 2
+MODEL = "cnn"   # can also use hog, better for cpu-only
+
+video = cv2.VideoCapture("facerecvid.mp4")
+
+print("Loading known faces...")
+
+known_faces = []
+known_names = []
+
+for name in os.listdir(KNOWN_FACES_DIR):
+    for filename in os.listdir(f"{KNOWN_FACES_DIR}/{name}"):
+    # can also use os.join for better os independency
+        encoded_image = pickle.load(open(f"{name}/{filename}", "rb"))
+        known_faces.append(encoded_image)
+        known_names.append(int(name))
+
+if len(known_names) > 0:
+    next_id = max(known_names) + 1
+else:
+    next_id = 0
+
+
+print("Checking unknown faces...")
+
+while True:
+    futures = [detect_unknown.remote()]
+    ray.get(futures)
+
     if cv2.waitKey(1) & 0xFF == ord("q"):
-        # break if user presses the q key
-        break
+            # break if user presses the q key
+            break
